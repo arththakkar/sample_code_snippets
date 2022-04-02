@@ -1,0 +1,308 @@
+<% content_for :head do %>
+  <% if @event.hidden_event? || @event.private_event? %>
+    <meta name="robots" content="noindex">
+  <% end %>
+
+  <%= render 'shared/organiser_data' %>
+  <%= render 'application/custom_theme', theme: @theme if @theme.present? %>
+<% end %>
+
+<%= content_for :meta_title, "#{@event.name} | Hopin" %>
+<%= content_for :meta_description, truncate_at_word_boundary(255, strip_with_spaces(@event.description)) %>
+<%= content_for :meta_image, @event.picture(@event.picture_content_type == 'image/gif' ? :original : :large) %>
+
+<% if Rails.env.production? %>
+  <script>
+    ahoy.track("Visited Event", {title: "<%= @event.name %>", event_id: <%= @event.id %>});
+  </script>
+<% end %>
+
+<div class="wrapper mt-40">
+  <div class="container event-page">
+    <div class="event-page_header">
+      <h1><%= @event.name %></h1>
+
+      <div class="mt-8 flex -align-center -wrap">
+        <div class="mr-16 flex -align-center">
+          <span class="icon mr-4"><%= inline_svg_tag 'v2/icons/calendar.svg' %></span>
+
+          <span><%= event_dates_label(@event).html_safe %></span>
+        </div>
+
+        <% if @event.show_all? && @registrations_count > 1 %>
+          <div class="flex -align-center">
+            <span class="icon mr-4"><%= inline_svg_tag 'v2/icons/user.svg' %></span>
+
+            <span>
+              <strong><%= @registrations_count %></strong> people
+              <%= @event.event_finished? ? 'attended' : 'attending' %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+      <div class="event-banner -rounded mt-16" style="background-image: url(<%= css_url(@event.picture(:original)) %>);"></div>
+    </div>
+
+    <div class="event-page_content mt-24" id="top">
+      <% if [@event.description, @sponsors, @schedule, @speakers, @vendors].filter_map(&:present?).length > 1 %>
+        <div class="tabs">
+          <% if @event.description.present? %>
+            <a class="tabs_item -active" href="#top">
+              <%= @locale&.dig('description') || 'Description' %>
+            </a>
+          <% end %>
+
+          <% if @sponsors.present? %>
+            <a class="tabs_item" href="#sponsors">
+              <%= @locale&.dig('sponsors') || 'Sponsors' %>
+            </a>
+          <% end %>
+
+          <% if @schedule.present? %>
+            <a class="tabs_item" href="#schedule">
+              <%= @locale&.dig('schedule') || 'Schedule' %>
+            </a>
+          <% end %>
+
+          <% if @speakers.present? %>
+            <a class="tabs_item" href="#speakers">
+              <%= @locale&.dig('speakers') || 'Speakers' %>
+            </a>
+          <% end %>
+
+          <% if @vendors.present? %>
+            <a class="tabs_item" href="#booths">
+              <%= @locale&.dig('booths') || 'Booths' %>
+            </a>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if @event.description.present? %>
+        <article class="rich-text mt-24">
+          <%= @event.description.html_safe %>
+        </article>
+      <% end %>
+
+      <% if @sponsors.present? %>
+        <div id="sponsors" class="pt-64">
+          <h2 class="heading -level-3"><%= @locale&.dig('proudly-supported-by') || 'Proudly Supported By' %></h2>
+
+          <div class="event-sponsors <%= '-large' if @sponsors.length < 4 %> mt-16">
+            <% @sponsors.each do |sponsor| %>
+              <a href="<%= sponsor.website %>" target="_blank" class="card">
+                <div class="event-sponsors_card-content">
+                  <img src="<%= sponsor.logo %>" alt="<%= sponsor.name %>" title="<%= sponsor.name %>">
+                </div>
+              </a>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @schedule.present? %>
+        <div id="schedule" class="pt-64">
+          <h2 class="heading -level-3" id="schedule"><%= @locale&.dig('schedule') || 'Schedule' %></h2>
+
+          <div class="mt-16">
+            <% @schedule.each_with_index do |schedule, index| %>
+              <div class="p-16 flex <%= 'card -gray' if index % 2 == 0 %>">
+                <div>
+                  <span class="text -light">
+                    <%= local_relative_time(schedule.time_start, type: 'weekday-or-date', class: 'text -capitalize') %>
+                    <%= local_time(schedule.time_start,"%l:%M%p") %>–<%= local_time(schedule.time_end,"%l:%M%p") %>
+                    · <%= schedule.event_part.type_name %>
+                  </span>
+
+                  <div class="text -semi-bold mt-8"><%= schedule.name %></div>
+
+                  <% if !schedule.speakers.blank?%>
+                    <div class="speaker-avatars mt-8">
+                      <% schedule.speakers.each do |speaker| %>
+                        <img src="<%= speaker.user.picture(:medium) %>" alt="<%= speaker.user.name %>" data-toggle="tooltip" title="<%= speaker.user.name %>"  class="avatar -size-40">
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+
+                <a
+                  class="button -secondary -small -icon-only ml-auto"
+                  target="_blank"
+                  href="<%= schedule.decorate.calendar_link %>"
+                >
+                  <%= inline_svg_tag 'v2/icons/calendar-add.svg' %>
+                </a>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @speakers.present? %>
+        <div id="speakers" class="pt-64">
+          <h2 class="heading -level-3"><%= @locale&.dig('speakers') || 'Speakers' %></h2>
+
+          <div class="speaker-cards mt-16">
+            <% @speakers.each do |speaker| %>
+              <div class="card p-16 flex -align-start">
+                <img src="<%= speaker.user.picture(:medium) %>" alt="<%= speaker.user.name %>" class="avatar mr-16">
+
+                <div>
+                  <span class="text -semi-bold"><%= speaker.user.name %></span>
+
+                  <p class="text -light mt-4">
+                    <%= speaker.headline || speaker.user.headline %>
+                  </p>
+
+                  <div class="flex -align-center mt-8">
+                    <% if speaker.user.website.present?  %>
+                      <a href="<%= speaker.user.website %>" target="_blank" class="icon mr-16">
+                        <%= inline_svg_tag 'v2/icons/globe.svg' %>
+                      </a>
+                    <% end %>
+
+                    <% if speaker.user.linkedin.present?  %>
+                      <a href="<%= speaker.user.linkedin %>" target="_blank" class="icon mr-16">
+                        <%= inline_svg_tag 'v2/icons/linkedin.svg' %>
+                      </a>
+                    <% end %>
+
+                    <% if speaker.user.twitter.present?  %>
+                      <a href="<%= speaker.user.twitter %>" target="_blank" class="icon mr-16">
+                        <%= inline_svg_tag 'v2/icons/twitter.svg' %>
+                      </a>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="event-page_sidebar">
+      <% if @event.event_finished? %>
+        <div class="card p-16 mb-32">
+          <h2 class="heading -level-3 mr-auto">
+            The event is over
+          </h2>
+        </div>
+      <% elsif @event.user_attending? current_user %>
+        <% if @event.starting_now? %>
+          <div class="card p-16 mb-32">
+            <h2 class="heading -level-3 mr-auto flex -align-center">
+              <span class="tag -live mr-8">Live</span>
+              The event is live!
+            </h2>
+
+            <a href="<%= reception_event_path(@event.slug) %>" class="button -full mt-24">
+              Enter event
+            </a>
+          </div>
+        <% else %>
+          <div class="card p-16 mb-32">
+            <h2 class="heading -level-3 mr-auto flex -align-center">
+              <%= image_tag 'v2/icons/success.svg', class: 'mr-8' %>
+              You’re in!
+            </h2>
+
+            <p class="text -light mt-16">
+              You’ll be able to access the event five minutes before it starts.
+            </p>
+
+            <a
+              class="button -secondary -full mt-24"
+              target="_blank"
+              href="<%= @event.decorate.calendar_link %>"
+            >
+              <%= inline_svg_tag 'v2/icons/add.svg' %>
+              Add to calendar
+            </a>
+
+            <% if current_user.event_organiser?(@event) %>
+              <a href="<%= reception_event_path(@event.slug) %>" class="button -full mt-16">
+                Preview (organiser only)
+              </a>
+            <% end %>
+          </div>
+        <% end %>
+      <% elsif @event.organization.registrations_paused %>
+        <div class="card p-16 mb-32">
+          <h2 class="heading -level-3 mr-auto">
+            No more registrations
+          </h2>
+
+          <p class="text -light mt-16">
+            This event is not accepting any more registrations, please contact the organizer for more info.
+          </p>
+        </div>
+      <% else %>
+        <%= render 'tickets' %>
+      <% end %>
+
+      <div class="card p-16">
+        <div class="flex">
+          <%= image_tag @event.organization_logo, class: 'logo-avatar mr-12' %>
+
+          <div>
+            <span class="text -light"><%= @locale&.dig('hosted-by') || 'Hosted by' %></span>
+
+            <h2 class="heading -level-3 mr-auto">
+              <%= @event.organization.name %>
+            </h2>
+          </div>
+        </div>
+
+        <p class="text -light mt-16">
+          <%= @event.organization.about %>
+        </p>
+
+        <div class="flex -align-center mt-16">
+          <% if @event.organization.website.present?  %>
+            <a href="<%= @event.organization.website %>" target="_blank" class="icon mr-16">
+              <%= inline_svg_tag 'v2/icons/globe.svg' %>
+            </a>
+          <% end %>
+
+          <% if @event.organization.facebook.present?  %>
+            <a href="<%= @event.organization.facebook %>" target="_blank" class="icon mr-16">
+              <%= inline_svg_tag 'v2/icons/facebook.svg' %>
+            </a>
+          <% end %>
+
+          <% if @event.organization.twitter.present?  %>
+            <a href="<%= @event.organization.twitter %>" target="_blank" class="icon mr-16">
+              <%= inline_svg_tag 'v2/icons/twitter.svg' %>
+            </a>
+          <% end %>
+
+          <a href="mailto:<%= @event.organization.email %>" target="_blank" class="icon mr-16">
+            <%= inline_svg_tag 'v2/icons/envelope.svg' %>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if @vendors.present? %>
+    <div class="container pt-64" id="booths">
+      <h2 class="heading -level-3" id="booths"><%= @locale&.dig('booths') || 'Booths' %></h2>
+
+      <div class="event-booths mt-16">
+        <% @vendors.each do |vendor| %>
+          <div class="event-booths_card -<%= vendor.booth_size %>" style="background-image: url(<%= css_url(vendor.background_image(:large)) %>)">
+            <img src="<%= vendor.logo %>" alt="<%= vendor.name %>" class="logo-avatar -size-76">
+
+            <h3><%= vendor.name %></h3>
+            <p class="mt-8 text -medium"><%= vendor.headline %></p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<script>
+  scrollSpy('.tabs_item', '-active')
+</script>
